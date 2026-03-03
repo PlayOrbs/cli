@@ -18,7 +18,9 @@ export function registerJoinCommand(program: Command): void {
     .option('--referrer <pubkey>', 'Referrer public key')
     .option('--wallet <path>', 'Wallet keypair path override')
     .option('--rpc <url>', 'RPC endpoint override')
-    .option('--alloc <strategy>', 'Skill allocation: even, aggro, defense, speed (default: even)')
+    .option('--alloc <strategy>', 'Skill allocation strategy: even, aggro, defense, speed (default: even)')
+    .option('--skills <a,d,s>', 'Exact skill allocation as aggro,defense,speed (e.g. --skills 5,3,2). Overrides --alloc')
+    .option('--spawn <xNorm,yNorm[,rotRad]>', 'Spawn position (e.g. --spawn 0.3,-0.5 or --spawn 0.3,-0.5,1.57). Default: random')
     .option('--json', 'Output as JSON')
     .option('--dry-run', 'Simulate without broadcasting')
     .action(async (opts: OutputOptions & {
@@ -29,6 +31,8 @@ export function registerJoinCommand(program: Command): void {
       wallet?: string;
       rpc?: string;
       alloc?: string;
+      skills?: string;
+      spawn?: string;
       dryRun?: boolean;
     }, cmd: Command) => {
       try {
@@ -124,11 +128,42 @@ export function registerJoinCommand(program: Command): void {
         }
 
         // Step 4: Allocate skills
-        const allocStrategy = opts.alloc || 'even';
-        const allocation = allocateSkills(solution.earnedSp, allocStrategy, matrixConfig.pointsTotal);
+        let allocation: { splitAggro: number; tetherRes: number; power: number };
+        if (opts.skills) {
+          const parts = opts.skills.split(',').map(Number);
+          if (parts.length !== 3 || parts.some(isNaN)) {
+            outputError('Invalid --skills format. Use: --skills aggro,defense,speed (e.g. --skills 5,3,2)', EXIT_CODES.ERROR, opts);
+          }
+          const total = parts[0] + parts[1] + parts[2];
+          if (total > solution.earnedSp) {
+            outputError(`Skill total (${total}) exceeds earned SP (${solution.earnedSp})`, EXIT_CODES.ERROR, opts);
+          }
+          allocation = { splitAggro: parts[0], tetherRes: parts[1], power: parts[2] };
+        } else {
+          const allocStrategy = opts.alloc || 'even';
+          allocation = allocateSkills(solution.earnedSp, allocStrategy, matrixConfig.pointsTotal);
+        }
 
-        // Step 5: Generate spawn position
-        const spawn = generateRandomSpawn(roundId);
+        // Step 5: Spawn position (xNorm, yNorm in [-1,1], rotRad in [0, 2π))
+        let spawn;
+        if (opts.spawn) {
+          const parts = opts.spawn.split(',').map(Number);
+          if ((parts.length !== 2 && parts.length !== 3) || parts.some(isNaN)) {
+            outputError('Invalid --spawn format. Use: --spawn xNorm,yNorm or --spawn xNorm,yNorm,rotRad', EXIT_CODES.ERROR, opts);
+          }
+          const [xNorm, yNorm] = parts;
+          if (xNorm < -1 || xNorm > 1 || yNorm < -1 || yNorm > 1) {
+            outputError('Spawn xNorm and yNorm must be in [-1, 1]', EXIT_CODES.ERROR, opts);
+          }
+          if (xNorm * xNorm + yNorm * yNorm > 0.81) {
+            outputError('Spawn position is outside the arena (must be within 0.9 radius from center)', EXIT_CODES.ERROR, opts);
+          }
+          // Use provided rotRad or derive deterministically from roundId
+          const rotRad = parts.length === 3 ? parts[2] : ((roundId * 2654435761) >>> 0) / 4294967296 * 2 * Math.PI;
+          spawn = { xNorm, yNorm, rotRad };
+        } else {
+          spawn = generateRandomSpawn(roundId);
+        }
 
         // Step 6: Submit to Matrix Worker
         if (!opts.json) {
