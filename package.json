@@ -1,0 +1,37 @@
+{
+  "name": "@orbs-game/cli",
+  "version": "0.1.0",
+  "description": "CLI tool for interacting with the PlayOrbs Solana program",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "bin": {
+    "playorbs": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "keywords": ["solana", "orbs", "gaming", "cli"],
+  "author": "PlayOrbs",
+  "license": "BSL-1.1",
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@dfinity/agent": "^3.4.3",
+    "@dfinity/candid": "^3.4.3",
+    "@dfinity/identity": "^3.4.3",
+    "@dfinity/principal": "^3.4.3",
+    "@orbs-game/sdk": "file:../sdk",
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.95.8",
+    "bn.js": "^5.2.1",
+    "bs58": "6.0.0",
+    "commander": "^12.1.0",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.2.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.7.2"
+  }
+}
