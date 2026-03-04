@@ -13,6 +13,7 @@ import { registerReferralCommand } from './commands/referral';
 import { registerClaimCommand } from './commands/claim';
 import { registerKeygenCommand } from './commands/keygen';
 import { registerProfileCommand } from './commands/profile';
+import { registerResultsCommand } from './commands/results';
 
 const program = new Command();
 
@@ -34,5 +35,6 @@ registerReferralCommand(program);
 registerClaimCommand(program);
 registerKeygenCommand(program);
 registerProfileCommand(program);
+registerResultsCommand(program);
 
 program.parse(process.argv);
