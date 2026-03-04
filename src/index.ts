@@ -14,6 +14,8 @@ import { registerClaimCommand } from './commands/claim';
 import { registerKeygenCommand } from './commands/keygen';
 import { registerProfileCommand } from './commands/profile';
 import { registerResultsCommand } from './commands/results';
+import { registerWatchCommand } from './commands/watch';
+import { registerMyRoundsCommand } from './commands/my-rounds';
 
 const program = new Command();
 
@@ -36,5 +38,7 @@ registerClaimCommand(program);
 registerKeygenCommand(program);
 registerProfileCommand(program);
 registerResultsCommand(program);
+registerWatchCommand(program);
+registerMyRoundsCommand(program);
 
 program.parse(process.argv);

@@ -21,21 +21,24 @@ export function registerMeCommand(program: Command): void {
         }
 
         const seasonId = opts.season !== undefined ? parseInt(opts.season, 10) : 0;
-        const stats = await sdk.getPlayerStats(pubkey, seasonId);
-
-        if (!stats) {
-          outputError(`No stats found for ${pubkey.toBase58()}`, 1, opts);
+        
+        let stats;
+        try {
+          stats = await sdk.getPlayerStats(pubkey, seasonId);
+        } catch {
+          stats = null;
         }
 
+        // Return zeros if no stats found (new player)
         const data = {
           pubkey: pubkey.toBase58(),
           seasonId,
-          roundsPlayed: stats.roundsPlayed,
-          wins: stats.wins,
-          kills: stats.kills,
-          seasonPoints: stats.seasonPoints?.toString() ?? '0',
-          solEarnedLamports: stats.solEarnedLamports?.toString() ?? '0',
-          solEarned: (Number(stats.solEarnedLamports?.toString() ?? '0') / 1_000_000_000).toFixed(4),
+          roundsPlayed: stats?.roundsPlayed ?? 0,
+          wins: stats?.wins ?? 0,
+          kills: stats?.kills ?? 0,
+          seasonPoints: stats?.seasonPoints?.toString() ?? '0',
+          solEarnedLamports: stats?.solEarnedLamports?.toString() ?? '0',
+          solEarned: (Number(stats?.solEarnedLamports?.toString() ?? '0') / 1_000_000_000).toFixed(4),
         };
 
         if (opts.json) {
