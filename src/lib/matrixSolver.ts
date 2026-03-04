@@ -153,7 +153,6 @@ export interface TranscriptEvent {
   type: 'collect' | 'miss' | 'reveal' | 'shuffle';
   tMs: number;
   idx?: number;
-  pts?: number;
 }
 
 /**
@@ -201,7 +200,7 @@ export function solveMatrix(seed: string, config: MatrixConfig): SolverResult {
 
     clicks.push({ logicalIdx, displayIdx, isPoint: true });
     earnedSp++;
-    transcript.push({ type: 'collect', tMs, idx: logicalIdx, pts: 1 });
+    transcript.push({ type: 'collect', tMs, idx: logicalIdx });
     tMs += 200; // 200ms between clicks (realistic)
 
     // Trigger shuffle after N points found
