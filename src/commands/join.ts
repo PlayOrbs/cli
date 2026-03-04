@@ -276,9 +276,21 @@ export function registerJoinCommand(program: Command): void {
               }
             }
 
-            // Fetch and display results
-            const snapshot = await icp.getRoundSnapshot(tierId, roundId);
-            if (snapshot) {
+            // Fetch and display results (retry a few times as ICP may lag behind chain)
+            if (!opts.json) {
+              process.stderr.write('\nFetching results from ICP...\n');
+            }
+            let snapshot = null;
+            for (let attempt = 0; attempt < 5; attempt++) {
+              snapshot = await icp.getRoundSnapshot(tierId, roundId);
+              if (snapshot && snapshot.players && snapshot.players.length > 0) break;
+              if (!opts.json) {
+                process.stderr.write(`  Waiting for results (attempt ${attempt + 1}/5)...\n`);
+              }
+              await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+
+            if (snapshot && snapshot.players && snapshot.players.length > 0) {
               const players = [...snapshot.players].sort((a, b) => a.placement - b.placement);
               const pubkeys = players.map(p => new PublicKey(p.player));
               const nicknames = await sdk.fetch.nicknames(pubkeys);
@@ -301,7 +313,6 @@ export function registerJoinCommand(program: Command): void {
               if (opts.json) {
                 output({ ...data, settled: true, results, myResult }, opts);
               } else {
-                process.stderr.write('\n');
                 output(`\nRound #${roundId} Results:`, opts);
                 output('Place  Player              Kills  Payout', opts);
                 output('─'.repeat(45), opts);
@@ -312,6 +323,13 @@ export function registerJoinCommand(program: Command): void {
                 if (myResult) {
                   output(`\nYour placement: #${myResult.placement}, Payout: ${myResult.payoutSol} SOL`, opts);
                 }
+              }
+            } else {
+              if (opts.json) {
+                output({ ...data, settled: true, results: [], myResult: null, error: 'Results not available yet' }, opts);
+              } else {
+                output(`\nRound #${roundId} settled but results not yet available on ICP.`, opts);
+                output(`Run: playorbs results --round ${roundId} --tier ${tierId}`, opts);
               }
             }
 
