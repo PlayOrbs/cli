@@ -112,6 +112,15 @@ export function registerJoinCommand(program: Command): void {
 
         const solution = solveMatrix(startResponse.playerSeed, matrixConfig);
 
+        // Record click events with the server (required for earnedSp tracking)
+        for (const click of solution.clicks) {
+          await matrix.recordEvent({
+            roundId: String(roundId),
+            kind: 'click',
+            displayIdx: click.logicalIdx,
+          });
+        }
+
         if (!opts.json) {
           process.stderr.write(`Solved matrix: earned ${solution.earnedSp} SP\n`);
         }
