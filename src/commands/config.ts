@@ -16,14 +16,37 @@ export function registerConfigCommand(program: Command): void {
     .command('show')
     .description('Show current configuration')
     .option('--json', 'Output as JSON')
-    .action((opts: OutputOptions, cmd: Command) => {
+    .option('--reveal', 'Show full RPC URL (default: redacted for security)')
+    .action((opts: OutputOptions & { reveal?: boolean }, cmd: Command) => {
       const config = loadConfig(getNetwork(cmd));
+      
+      // Redact RPC URL by default to prevent accidental exposure of private endpoints
+      const redactRpc = (url: string | undefined): string => {
+        if (!url) return '(not set)';
+        if (opts.reveal) return url;
+        try {
+          const parsed = new URL(url);
+          // Show host but redact path/query which may contain API keys
+          return `${parsed.protocol}//${parsed.host}/***`;
+        } catch {
+          return '***';
+        }
+      };
+      
+      const displayConfig = {
+        ...config,
+        rpc: redactRpc(config.rpc),
+      };
+      
       if (opts.json) {
-        output(config, opts);
+        output(displayConfig, opts);
       } else {
         output(`Config file: ${getConfigPath()}\n`, opts);
-        for (const [key, value] of Object.entries(config)) {
+        for (const [key, value] of Object.entries(displayConfig)) {
           process.stdout.write(`  ${key}: ${value}\n`);
+        }
+        if (!opts.reveal) {
+          process.stdout.write('\n  (RPC redacted — use --reveal to show full URL)\n');
         }
       }
     });

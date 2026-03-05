@@ -54,6 +54,7 @@ playorbs join
 | `profile init` | Initialize player profile |
 | `profile nickname <name>` | Set your nickname |
 | `profile refer <pubkey>` | Set your referrer |
+| `stats` | Show local round statistics |
 
 ## Join Command
 
@@ -88,6 +89,34 @@ playorbs join --dry-run --json
 | `--spawn <x,y[,rot]>` | Normalized position [-1,1], optional rotation in radians | Random (deterministic) |
 | `--referrer <pubkey>` | Referrer public key | None |
 | `--dry-run` | Simulate without broadcasting | Off |
+| `--wait` | Wait for round to settle and show results | Off |
+| `--auto` | Continuous loop: join → wait → results → repeat | Off |
+| `--stats-file <path>` | Stats file for tracking results (with --wait/--auto) | `~/.config/playorbs/stats.json` |
+
+## Stats Command
+
+Track and analyze your round performance locally.
+
+```bash
+# Show stats summary
+playorbs stats
+
+# JSON output
+playorbs stats --json
+
+# Custom stats file
+playorbs stats --stats-file ~/my-stats.json
+```
+
+Stats are automatically recorded when using `--wait` or `--auto` with the join command.
+
+### Stats Output
+
+- **Rounds Played**: Total rounds tracked
+- **Wins / Win Rate**: First place finishes
+- **Total Earned**: Cumulative SOL payouts
+- **Total Kills**: Lifetime kills
+- **Best Strategy**: Skill allocation with highest win rate (min 3 rounds)
 
 ## Global Flags
 
@@ -95,7 +124,7 @@ playorbs join --dry-run --json
 |------|-------------|
 | `--devnet` | Use devnet configuration (RPC, ICP canister, Matrix Worker) |
 | `--json` | Machine-readable JSON output on all commands |
-| `--rpc <url>` | Override RPC endpoint |
+| `--rpc <url>` | Override RPC endpoint (use with caution) |
 | `--wallet <path>` | Override wallet keypair path |
 
 ## Network Support
@@ -148,8 +177,9 @@ Config stored at `~/.config/playorbs/config.json`:
 
 ```bash
 playorbs config show
-playorbs config set rpc https://my-rpc.example.com
 playorbs config set wallet ~/my-keypair.json
 playorbs config set defaultTier 0
 playorbs config set network devnet
 ```
+
+The default public RPC endpoints work well for most users. Custom RPC configuration is supported but not recommended unless you have specific requirements.

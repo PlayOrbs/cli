@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { Transaction, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { createSdk, createMatrixModule, createIcpModule } from '../lib/sdk';
+import { appendStats, type RoundStats } from '../lib/stats';
 import { loadKeypair } from '../lib/wallet';
 import { loadConfig } from '../lib/config';
 import { output, outputError, EXIT_CODES, type OutputOptions } from '../lib/output';
@@ -26,6 +27,7 @@ export function registerJoinCommand(program: Command): void {
     .option('--wait', 'Wait for round to settle and show results')
     .option('--auto', 'Continuous loop: join → wait → results → repeat')
     .option('--auto-delay <seconds>', 'Delay between auto loops (default: 5)')
+    .option('--stats-file <path>', 'Path to stats file for tracking results (used with --wait or --auto)')
     .action(async (opts: OutputOptions & {
       round?: string;
       tier?: string;
@@ -40,6 +42,7 @@ export function registerJoinCommand(program: Command): void {
       wait?: boolean;
       auto?: boolean;
       autoDelay?: string;
+      statsFile?: string;
     }, cmd: Command) => {
       const network = getNetwork(cmd);
       const config = loadConfig(network);
@@ -309,6 +312,31 @@ export function registerJoinCommand(program: Command): void {
               });
 
               const myResult = results.find(r => r.isMe);
+
+              // Track stats if we have results for this player
+              if (myResult) {
+                const statsEntry: RoundStats = {
+                  round_id: roundId,
+                  tier: tierId,
+                  skills: {
+                    aggro: allocation.splitAggro,
+                    defense: allocation.tetherRes,
+                    speed: allocation.power,
+                  },
+                  spawn,
+                  placement: myResult.placement,
+                  kills: myResult.kills,
+                  payout_sol: parseFloat(myResult.payoutSol),
+                  timestamp: new Date().toISOString(),
+                };
+                try {
+                  appendStats(statsEntry, opts.statsFile);
+                } catch (err) {
+                  if (!opts.json) {
+                    process.stderr.write(`Warning: Failed to save stats: ${err}\n`);
+                  }
+                }
+              }
 
               if (opts.json) {
                 output({ ...data, settled: true, results, myResult }, opts);
