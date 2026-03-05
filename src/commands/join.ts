@@ -123,20 +123,14 @@ export function registerJoinCommand(program: Command): void {
 
           const solution = solveMatrix(startResponse.playerSeed, matrixConfig);
 
-          // Record click events with the server (required for earnedSp tracking)
-          for (const click of solution.clicks) {
-            await matrix.recordEvent({
-              roundId: String(roundId),
-              kind: 'click',
-              displayIdx: click.logicalIdx,
-            });
-          }
+          // Get maxPerSkill from server config (fallback to pointsTotal for backwards compat)
+          const maxPerSkill = startResponse.config.maxPerSkill ?? matrixConfig.pointsTotal;
 
           if (!opts.json) {
             process.stderr.write(`Solved matrix: earned ${solution.earnedSp} SP\n`);
           }
 
-          // Step 4: Allocate skills
+          // Step 4: Allocate skills (BEFORE recording clicks to avoid wasting click budget on validation failure)
           let allocation: { splitAggro: number; tetherRes: number; power: number };
           if (opts.skills) {
             const parts = opts.skills.split(',').map(Number);
@@ -147,10 +141,24 @@ export function registerJoinCommand(program: Command): void {
             if (total > solution.earnedSp) {
               outputError(`Skill total (${total}) exceeds earned SP (${solution.earnedSp})`, EXIT_CODES.ERROR, opts);
             }
+            // Validate individual skills against maxPerSkill
+            if (parts.some(p => p > maxPerSkill)) {
+              outputError(`Each skill must be ≤ ${maxPerSkill} (maxPerSkill)`, EXIT_CODES.ERROR, opts);
+            }
             allocation = { splitAggro: parts[0], tetherRes: parts[1], power: parts[2] };
           } else {
             const allocStrategy = opts.alloc || 'even';
-            allocation = allocateSkills(solution.earnedSp, allocStrategy, matrixConfig.pointsTotal);
+            allocation = allocateSkills(solution.earnedSp, allocStrategy, maxPerSkill);
+          }
+
+          // Record click events with the server (required for earnedSp tracking)
+          // Done AFTER validation to avoid wasting click budget if allocation is invalid
+          for (const click of solution.clicks) {
+            await matrix.recordEvent({
+              roundId: String(roundId),
+              kind: 'click',
+              displayIdx: click.logicalIdx,
+            });
           }
 
           // Step 5: Spawn position
