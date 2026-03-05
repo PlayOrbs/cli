@@ -1,6 +1,30 @@
+![PlayOrbs CLI](./assets/banner.png)
+
 # PlayOrbs CLI
 
 Command-line interface for interacting with the PlayOrbs Solana program. Designed for AI agents and humans — non-interactive, composable, machine-readable.
+
+## Agent Quickstart
+
+Copy-paste flow for first run:
+
+```bash
+# 1. Check balance (need ~0.01 SOL minimum)
+playorbs balance --json
+
+# 2. Find open rounds
+playorbs rounds --json
+
+# 3. Join with recommended strategy
+playorbs join --skills 1,3,1 --spawn 0.85,0.0 --wait --json
+
+# 4. Results are in stdout JSON: { settled: true, myResult: { placement, kills, payoutSol } }
+```
+
+For continuous operation:
+```bash
+playorbs join --auto --skills 1,3,1 --spawn 0.85,0.0 --stats-file ~/agent-stats.json
+```
 
 ## Install
 
@@ -90,8 +114,39 @@ playorbs join --dry-run --json
 | `--referrer <pubkey>` | Referrer public key | None |
 | `--dry-run` | Simulate without broadcasting | Off |
 | `--wait` | Wait for round to settle and show results | Off |
-| `--auto` | Continuous loop: join → wait → results → repeat | Off |
+| `--auto` | Continuous loop: join → wait → results → repeat (agent-friendly) | Off |
 | `--stats-file <path>` | Stats file for tracking results (with --wait/--auto) | `~/.config/playorbs/stats.json` |
+
+> **Agent note**: `--auto` is designed for agent loops. Combine with `--stats-file` for persistent tracking across sessions. Results are written to stdout as JSON when using `--json`.
+
+## Strategy Guide
+
+### Skill Slots
+
+Each round you earn up to 5 SP (Skill Points) from the matrix mini-game. Allocate them across:
+
+| Skill | Flag | Effect |
+|-------|------|--------|
+| **Aggro** | `splitAggro` | Increases split aggression — more likely to absorb smaller orbs |
+| **Defense** | `tetherRes` | Harder for enemies to break your tethers |
+| **Speed** | `orbPower` | Faster movement and acceleration |
+
+**Constraints**: `maxPerSkill = 3` (server-enforced). Total SP per round = 5.
+
+### Recommended Strategy
+
+```bash
+--skills 1,3,1 --spawn 0.85,0.0
+```
+
+- **1,3,1**: Prioritize defense (tether resistance) with minimal aggro/speed
+- **0.85,0.0**: Boundary spawn — edge positioning reduces attack vectors
+
+### Spawn Coordinates
+
+- Normalized range: `[-1, 1]` for both x and y
+- Max radius: `0.9` from center (arena boundary)
+- Boundary spawns (e.g., `0.85,0.0`) give edge advantage
 
 ## Stats Command
 
@@ -170,6 +225,16 @@ Errors output to stderr:
 | 2 | Round unavailable or full |
 | 3 | Insufficient balance |
 | 4 | Already joined |
+
+## Constraints
+
+Important limits agents need to know:
+
+- **One join per round per wallet** — attempting to rejoin returns exit code 4
+- **Matrix click budget is per-wallet per-round** — don't run debug/test sessions on rounds you plan to join for real
+- **Skills validated before clicks are recorded** — invalid allocation won't waste your click budget
+- **maxPerSkill = 3** — each individual skill capped at 3, total SP = 5
+- **Spawn radius ≤ 0.9** — positions outside this are rejected
 
 ## Configuration
 

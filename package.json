@@ -12,7 +12,12 @@
     "watch": "tsc --watch",
     "start": "node dist/index.js"
   },
-  "keywords": ["solana", "orbs", "gaming", "cli"],
+  "keywords": [
+    "solana",
+    "orbs",
+    "gaming",
+    "cli"
+  ],
   "author": "PlayOrbs",
   "license": "BSL-1.1",
   "dependencies": {
@@ -32,6 +37,7 @@
   "devDependencies": {
     "@types/bn.js": "^5.2.0",
     "@types/node": "^20.0.0",
+    "puppeteer": "^24.38.0",
     "typescript": "^5.7.2"
   }
 }
