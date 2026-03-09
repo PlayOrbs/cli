@@ -199,13 +199,22 @@ playorbs monitor \
 | `--tier <id>` | Tier to monitor | From config |
 | `--min-players <n>` | Player threshold to trigger alert | 3 |
 | `--interval <seconds>` | Poll interval | 10 |
+| `--hook-payload <json>` | Custom JSON payload (overrides default) | — |
 
-Webhook payload:
+Default webhook payload:
 ```json
 {
   "text": "🎮 PlayOrbs alert: Round #42 (Tier 0) has 3/8 players — time to jump in!",
   "mode": "now"
 }
+```
+
+Custom payload example with template variables (`{{id}}`, `{{tier}}`, `{{players}}`, `{{max}}`):
+```bash
+playorbs monitor \
+  --hook-url http://example.com/hooks/wake \
+  --hook-token secret \
+  --hook-payload '{"content": "Round {{id}} tier {{tier}}: {{players}}/{{max}}", "priority": "high"}'
 ```
 
 Each round is alerted only once. Alerts are cleared when the round settles.

@@ -13,6 +13,7 @@ export function registerMonitorCommand(program: Command): void {
     .option('--interval <seconds>', 'Poll interval in seconds (default: 10)')
     .requiredOption('--hook-url <url>', 'Hook endpoint')
     .option('--hook-token <token>', 'Hook auth token')
+    .option('--hook-payload <json>', 'Custom JSON payload (template vars: {{id}}, {{tier}}, {{players}}, {{max}})')
     .option('--json', 'Output as JSON')
     .option('--rpc <url>', 'RPC endpoint override')
     .action(async (opts: OutputOptions & {
@@ -21,6 +22,7 @@ export function registerMonitorCommand(program: Command): void {
       interval?: string;
       hookUrl: string;
       hookToken?: string;
+      hookPayload?: string;
       rpc?: string;
     }, cmd: Command) => {
       try {
@@ -33,6 +35,14 @@ export function registerMonitorCommand(program: Command): void {
         const intervalSec = opts.interval ? parseInt(opts.interval, 10) : 10;
         const hookUrl = opts.hookUrl;
         const hookToken = opts.hookToken || process.env.OPENCLAW_HOOK_TOKEN || '';
+        let hookPayloadTemplate: Record<string, unknown> | undefined;
+        if (opts.hookPayload) {
+          try {
+            hookPayloadTemplate = JSON.parse(opts.hookPayload);
+          } catch {
+            outputError('Invalid JSON in --hook-payload', 1, opts);
+          }
+        }
 
         if (!hookToken) {
           outputError('Hook token required: pass --hook-token or set OPENCLAW_HOOK_TOKEN', 1, opts);
@@ -87,7 +97,11 @@ export function registerMonitorCommand(program: Command): void {
 
                   process.stderr.write(`Alerting: ${text}\n`);
 
-                  const ok = await fireHook(hookUrl, hookToken, text);
+                  const payload = hookPayloadTemplate
+                    ? expandTemplate(hookPayloadTemplate, { id: roundId, tier: tierId, players: round.joinedCount, max: round.maxPlayers })
+                    : { text, mode: 'now' };
+
+                  const ok = await fireHook(hookUrl, hookToken, payload);
                   if (ok) {
                     alertedRounds.add(roundId);
                     process.stderr.write(`Hook delivered for round #${roundId}\n`);
@@ -119,7 +133,20 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function fireHook(url: string, token: string, text: string): Promise<boolean> {
+function expandTemplate(obj: unknown, vars: Record<string, string | number>): unknown {
+  if (typeof obj === 'string') {
+    return obj.replace(/\{\{(id|tier|players|max)\}\}/g, (_, key) => String(vars[key]));
+  }
+  if (Array.isArray(obj)) return obj.map(v => expandTemplate(v, vars));
+  if (obj && typeof obj === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) out[k] = expandTemplate(v, vars);
+    return out;
+  }
+  return obj;
+}
+
+async function fireHook(url: string, token: string, payload: unknown): Promise<boolean> {
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -127,7 +154,7 @@ async function fireHook(url: string, token: string, text: string): Promise<boole
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text, mode: 'now' }),
+      body: JSON.stringify(payload),
     });
     return res.ok;
   } catch (err: any) {
