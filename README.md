@@ -79,6 +79,7 @@ playorbs join
 | `profile nickname <name>` | Set your nickname |
 | `profile refer <pubkey>` | Set your referrer |
 | `stats` | Show local round statistics |
+| `monitor` | Poll rounds and webhook when player threshold met |
 
 ## Join Command
 
@@ -172,6 +173,42 @@ Stats are automatically recorded when using `--wait` or `--auto` with the join c
 - **Total Earned**: Cumulative SOL payouts
 - **Total Kills**: Lifetime kills
 - **Best Strategy**: Skill allocation with highest win rate (min 3 rounds)
+
+## Monitor Command
+
+Continuously polls active rounds and fires a webhook when the player count reaches a threshold. Runs indefinitely until killed.
+
+```bash
+playorbs monitor --hook-url http://127.0.0.1:18789/hooks/wake --hook-token mytoken
+
+# Full options
+playorbs monitor \
+  --tier 0 \
+  --min-players 4 \
+  --interval 5 \
+  --hook-url http://127.0.0.1:18789/hooks/wake \
+  --hook-token mytoken
+```
+
+### Monitor Flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--hook-url <url>` | Webhook endpoint (required) | — |
+| `--hook-token <token>` | Auth bearer token (or `OPENCLAW_HOOK_TOKEN` env) | — |
+| `--tier <id>` | Tier to monitor | From config |
+| `--min-players <n>` | Player threshold to trigger alert | 3 |
+| `--interval <seconds>` | Poll interval | 10 |
+
+Webhook payload:
+```json
+{
+  "text": "🎮 PlayOrbs alert: Round #42 (Tier 0) has 3/8 players — time to jump in!",
+  "mode": "now"
+}
+```
+
+Each round is alerted only once. Alerts are cleared when the round settles.
 
 ## Global Flags
 

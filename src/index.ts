@@ -17,6 +17,7 @@ import { registerResultsCommand } from './commands/results';
 import { registerWatchCommand } from './commands/watch';
 import { registerMyRoundsCommand } from './commands/my-rounds';
 import { registerStatsCommand } from './commands/stats';
+import { registerMonitorCommand } from './commands/monitor';
 
 const program = new Command();
 
@@ -42,5 +43,6 @@ registerResultsCommand(program);
 registerWatchCommand(program);
 registerMyRoundsCommand(program);
 registerStatsCommand(program);
+registerMonitorCommand(program);
 
 program.parse(process.argv);
