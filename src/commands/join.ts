@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { Transaction, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { createSdk, createMatrixModule, createIcpModule } from '../lib/sdk';
-import { appendStats, type RoundStats } from '../lib/stats';
+import { appendStats, writeLastRun, type RoundStats } from '../lib/stats';
 import { loadKeypair } from '../lib/wallet';
 import { loadConfig } from '../lib/config';
 import { output, outputError, EXIT_CODES, type OutputOptions } from '../lib/output';
@@ -28,6 +28,7 @@ export function registerJoinCommand(program: Command): void {
     .option('--auto', 'Continuous loop: join → wait → results → repeat')
     .option('--auto-delay <seconds>', 'Delay between auto loops (default: 5)')
     .option('--stats-file <path>', 'Path to stats file for tracking results (used with --wait or --auto)')
+    .option('--quiet', 'Suppress progress messages on stderr')
     .action(async (opts: OutputOptions & {
       round?: string;
       tier?: string;
@@ -43,6 +44,7 @@ export function registerJoinCommand(program: Command): void {
       auto?: boolean;
       autoDelay?: string;
       statsFile?: string;
+      quiet?: boolean;
     }, cmd: Command) => {
       const network = getNetwork(cmd);
       const config = loadConfig(network);
@@ -63,11 +65,11 @@ export function registerJoinCommand(program: Command): void {
               outputError('Invalid round ID', EXIT_CODES.ERROR, opts);
             }
           } else {
-            if (!opts.json) {
+            if (!opts.json && !opts.quiet) {
               process.stderr.write('Auto-detecting next joinable round...\n');
             }
             roundId = await sdk.getNextRoundId(tierId);
-            if (!opts.json) {
+            if (!opts.json && !opts.quiet) {
               process.stderr.write(`Found round #${roundId}\n`);
             }
           }
@@ -94,13 +96,13 @@ export function registerJoinCommand(program: Command): void {
           const pubkeyBase58 = keypair.publicKey.toBase58();
 
           // Step 1: Authenticate with Matrix Worker
-          if (!opts.json) {
+          if (!opts.json && !opts.quiet) {
             process.stderr.write('Authenticating with Matrix Worker...\n');
           }
           await matrix.authenticateWithKeypair(keypair.secretKey, pubkeyBase58);
 
           // Step 2: Start matrix session
-          if (!opts.json) {
+          if (!opts.json && !opts.quiet) {
             process.stderr.write('Starting matrix session...\n');
           }
           const startResponse = await matrix.startMatrix({
@@ -110,7 +112,7 @@ export function registerJoinCommand(program: Command): void {
           });
 
           // Step 3: Solve matrix
-          if (!opts.json) {
+          if (!opts.json && !opts.quiet) {
             process.stderr.write('Solving matrix...\n');
           }
           const matrixConfig: MatrixConfig = {
@@ -126,7 +128,7 @@ export function registerJoinCommand(program: Command): void {
           // Get maxPerSkill from server config (fallback to pointsTotal for backwards compat)
           const maxPerSkill = startResponse.config.maxPerSkill ?? matrixConfig.pointsTotal;
 
-          if (!opts.json) {
+          if (!opts.json && !opts.quiet) {
             process.stderr.write(`Solved matrix: earned ${solution.earnedSp} SP\n`);
           }
 
@@ -182,7 +184,7 @@ export function registerJoinCommand(program: Command): void {
           }
 
           // Step 6: Submit to Matrix Worker
-          if (!opts.json) {
+          if (!opts.json && !opts.quiet) {
             process.stderr.write('Submitting to Matrix Worker...\n');
           }
           const submitResponse = await matrix.submitMatrix({
@@ -217,7 +219,7 @@ export function registerJoinCommand(program: Command): void {
           }
 
           // Step 7: Sign transaction
-          if (!opts.json) {
+          if (!opts.json && !opts.quiet) {
             process.stderr.write('Signing transaction...\n');
           }
           const txBuffer = Buffer.from(submitResponse.joinTxBase64, 'base64');
@@ -225,7 +227,7 @@ export function registerJoinCommand(program: Command): void {
           tx.partialSign(keypair);
 
           // Step 8: Broadcast via Matrix Worker
-          if (!opts.json) {
+          if (!opts.json && !opts.quiet) {
             process.stderr.write('Broadcasting transaction...\n');
           }
           const signedTxBase64 = Buffer.from(
@@ -248,6 +250,20 @@ export function registerJoinCommand(program: Command): void {
             earnedSp: solution.earnedSp,
             allocation,
           };
+
+          // Write last-run timestamp immediately after successful join.
+          // This ensures heartbeat/automation knows a round was joined
+          // regardless of whether ICP results come back later.
+          try {
+            writeLastRun({
+              round_id: roundId,
+              tier: tierId,
+              signature: broadcastResponse.signature,
+              timestamp: new Date().toISOString(),
+            });
+          } catch {
+            // Non-fatal — don't block the join flow
+          }
 
           if (!opts.wait && !opts.auto) {
             if (opts.json) {
@@ -288,7 +304,7 @@ export function registerJoinCommand(program: Command): void {
             }
 
             // Fetch and display results (retry a few times as ICP may lag behind chain)
-            if (!opts.json) {
+            if (!opts.json && !opts.quiet) {
               process.stderr.write('\nFetching results from ICP...\n');
             }
             let snapshot = null;
@@ -361,6 +377,27 @@ export function registerJoinCommand(program: Command): void {
                 }
               }
             } else {
+              // Save partial stats even without ICP results so the round is recorded
+              const partialEntry: RoundStats = {
+                round_id: roundId,
+                tier: tierId,
+                skills: {
+                  aggro: allocation.splitAggro,
+                  defense: allocation.tetherRes,
+                  speed: allocation.power,
+                },
+                spawn,
+                placement: null,
+                kills: null,
+                payout_sol: null,
+                timestamp: new Date().toISOString(),
+              };
+              try {
+                appendStats(partialEntry, opts.statsFile);
+              } catch {
+                // Non-fatal
+              }
+
               if (opts.json) {
                 output({ ...data, settled: true, results: [], myResult: null, error: 'Results not available yet' }, opts);
               } else {
@@ -391,7 +428,7 @@ export function registerJoinCommand(program: Command): void {
           }
           // In auto mode, continue despite errors
           if (opts.auto) {
-            if (!opts.json) {
+            if (!opts.json && !opts.quiet) {
               process.stderr.write(`\nError occurred, retrying in ${autoDelayMs / 1000}s...\n\n`);
             }
             await new Promise(resolve => setTimeout(resolve, autoDelayMs));

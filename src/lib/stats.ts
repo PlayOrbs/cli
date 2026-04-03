@@ -7,13 +7,14 @@ export interface RoundStats {
   tier: number;
   skills: { aggro: number; defense: number; speed: number };
   spawn: { xNorm: number; yNorm: number; rotRad: number };
-  placement: number;
-  kills: number;
-  payout_sol: number;
+  placement: number | null;
+  kills: number | null;
+  payout_sol: number | null;
   timestamp: string;
 }
 
 const DEFAULT_STATS_FILE = path.join(os.homedir(), '.config', 'playorbs', 'stats.json');
+const LAST_RUN_FILE = path.join(os.homedir(), '.config', 'playorbs', 'last-run.json');
 
 export function getDefaultStatsPath(): string {
   return DEFAULT_STATS_FILE;
@@ -26,6 +27,28 @@ export function loadStats(statsFile?: string): RoundStats[] {
     return JSON.parse(raw);
   } catch {
     return [];
+  }
+}
+
+export interface LastRun {
+  round_id: number;
+  tier: number;
+  signature: string;
+  timestamp: string;
+}
+
+export function writeLastRun(entry: LastRun): void {
+  const dir = path.dirname(LAST_RUN_FILE);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(LAST_RUN_FILE, JSON.stringify(entry, null, 2) + '\n');
+}
+
+export function readLastRun(): LastRun | null {
+  try {
+    const raw = fs.readFileSync(LAST_RUN_FILE, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return null;
   }
 }
 
