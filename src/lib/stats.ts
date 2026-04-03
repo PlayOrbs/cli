@@ -95,9 +95,9 @@ export function aggregateStats(stats: RoundStats[]): AggregatedStats {
   const rounds_played = stats.length;
   const wins = stats.filter(s => s.placement === 1).length;
   const win_rate = rounds_played > 0 ? wins / rounds_played : 0;
-  const total_earned_sol = stats.reduce((sum, s) => sum + s.payout_sol, 0);
-  const total_kills = stats.reduce((sum, s) => sum + s.kills, 0);
-  const avg_placement = stats.reduce((sum, s) => sum + s.placement, 0) / rounds_played;
+  const total_earned_sol = stats.reduce((sum, s) => sum + (s.payout_sol ?? 0), 0);
+  const total_kills = stats.reduce((sum, s) => sum + (s.kills ?? 0), 0);
+  const avg_placement = stats.reduce((sum, s) => sum + (s.placement ?? 0), 0) / rounds_played;
 
   // Find best strategy by win rate (group by skill allocation)
   const strategyMap = new Map<string, { wins: number; rounds: number; skills: { aggro: number; defense: number; speed: number } }>();
